@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Filtering Leaflets</title>
+	<meta charset="utf-8" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css" />
+	<script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js"></script>
+
+	<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
+</head>
+<body>
+
+	    <h1 style="color: black; position: relative; left: 220px; margin: 1px;">UBC Buildings & Fields</h1>
+
+  <div id="mapid" style="width: 800px; height: 800px;"></div>
+
+  <div id="controls" style="margin: 15px;">
+    <button id="showAllAddressesButton">Show All Buildings</button>
+
+    <span style="display:inline-block; width: 30px"></span>
+    <input style="width: 200px" type="text" id="highlightPointsTextEntry"
+           placeholder="Search Address or Building Name">
+    <button id="highlightAddressesButton">Highlight</button>
+
+	</div>
+
+  <script>
+
+	var map = L.map('mapid', {
+		center: [49.2626, -123.2480],
+		zoom: 15
+		}
+	);
+
+	var topoTiles = L.tileLayer(
+		'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+			maxZoom: 19,
+		}
+	).addTo(map);
+
+	//Points
+
+    var stylePoint = {
+    	radius: 4,
+    	fillColor: "#636363",
+    	color: "black",
+    	weight: 1,
+			opacity: 0.5,
+			fillOpacity: 0.65
+		};
+
+    var highlightPoint = {
+    	radius: 4,
+    	fillColor: "red",
+    	color: "black",
+    	weight: 1,
+			opacity: 1,
+			fillOpacity: 1
+		};
+
+    function onEachPoint(feature, layer) {
+       if (feature.properties && feature.properties.FULLADDRESS && feature.properties.BUILDINGNAME) {
+          layer.bindTooltip(feature.properties.BUILDINGNAME + "<br>" + feature.properties.FULLADDRESS);
+       }
+    }
+
+    function pointPointToLayer(feature, latlng) {
+      if (addressToHighlight === "") {
+        stylePointToUse = stylePoint;
+      } else {
+        stylePointToUse = highlightPoint;
+      }
+      return L.circleMarker(
+        latlng,
+        stylePointToUse
+      );
+    }
+
+    function pointsToFilter (feature, layer) {
+      if(addressToHighlight === "") {
+        return true;
+      }
+      else if ((feature.properties && feature.properties.FULLADDRESS && feature.properties.BUILDINGNAME)) {
+        return feature.properties.FULLADDRESS.toLowerCase().includes(addressToHighlight.toLowerCase()) +
+				feature.properties.BUILDINGNAME.toLowerCase().includes(addressToHighlight.toLowerCase());
+      }
+			else {
+        return false;
+      }
+    }
+
+ 		var layerAdded = {};
+
+    function addPoints() {
+      if(map.hasLayer(layerAdded)){
+        map.removeLayer(layerAdded);
+      }
+    	layerAdded = L.geoJSON(pointGeoJSONdata, {
+   												pointToLayer: pointPointToLayer,
+                 				  onEachFeature: onEachPoint,
+          								filter: pointsToFilter
+      									 }
+                       );
+      layerAdded.addTo(map);
+    };
+
+    var addressToHighlight = "";
+
+    function highlightPoints() {
+      addressToHighlight = document
+    												.getElementById("highlightPointsTextEntry")
+      											.value;
+      addPoints();
+      addressToHighlight = "";
+    }
+
+		var pointGeoJSONdata;
+
+		$.getJSON("https://raw.githubusercontent.com/UBCGeodata/ubcv-locations/master/geojson/ubcv_addresses.geojson",
+              function(data){
+			      		pointGeoJSONdata = data;
+								document
+                  .getElementById("showAllAddressesButton")
+                  .addEventListener("click", addPoints);
+      					document
+                  .getElementById("highlightAddressesButton")
+                  .addEventListener("click", highlightPoints);
+
+    					}
+    );
+
+		//Polygons
+
+			function getColor(c) {
+					return c == "track"     ? '#f7fcb9' :
+								 c == "concrete"  ? '#bdbdbd' :
+								 c == "garden"    ? '#31a354' :
+								 c == "field"     ? '#2ca25f' :
+								 c == "astro"     ? '#99d8c9' :
+								 c == "farm"      ? '#a1d99b' :
+																		'#007800';
+			}
+
+		function stylePoly(feature) {
+				return {
+						fillColor: getColor(feature.properties.SURFACE_TYPE),
+						weight: 1,
+						opacity: 0.8,
+						color: 'black',
+						dashArray: '3',
+						fillOpacity: 0.6
+				};
+		}
+
+		function onEachPolygon(feature, layer) {
+			 if (feature.properties && feature.properties.NAME) {
+					layer.bindTooltip(feature.properties.NAME);
+			 }
+		}
+
+		$.getJSON("https://raw.githubusercontent.com/UBCGeodata/ubcv-landscape/master/geojson/ubcv_fields.geojson",
+		function(data2) {
+			L.geoJSON(data2, {style: stylePoly, onEachFeature: onEachPolygon}).addTo(map);
+		});
+
+  </script>
+
+</body>
+</html>
